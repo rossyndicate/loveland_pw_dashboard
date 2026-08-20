@@ -1,0 +1,4 @@
+﻿site_code,latitude,longitude,equipment,sensors
+grgr_res,40.4304227,-105.2119256,AT500,"fDOM, chl-a, SC, Temp, Turbidity"
+cbt_turnout,40.44223377,-105.2188475,"Two AT500s, one at surface and one at depth","fDOM, chl-a (or DO?), SC, Temp, Turbidity"
+big_t_turnout,40.42484065,-105.2106281,AT700,"fDOM, chl-a, SC, Temp, Turbidity, pH, DO"
