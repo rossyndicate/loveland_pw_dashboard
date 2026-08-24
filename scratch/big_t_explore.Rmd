@@ -183,7 +183,11 @@ all_data <- map2(telemetry$abbrev, telemetry$parameter, function(abbrev_oi, para
   bind_rows() %>%
   mutate(parameter = ifelse(parameter == "DISCHRG2", "DISCHRG", parameter))%>%
   mutate(meas_unit = ifelse(meas_unit == "CFS", "cfs", meas_unit))%>%
-  left_join(telemetry%>%st_drop_geometry()%>%select(abbrev,station_name, station_type), by = "abbrev")
+  left_join(
+    telemetry %>%
+    st_drop_geometry() %>%
+    select(abbrev,station_name, station_type), by = "abbrev"
+    )
 ```
 
 
