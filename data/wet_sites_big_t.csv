@@ -1,12 +1,12 @@
-﻿site_code,parameter,sensor_number,units,active,lat_long
-reservoir_bypass,Turbidity,95201,NTU,yes,
-reservoir_bypass,Specific Conductivity,95202,us/cm,yes,
-reservoir_bypass,Temperature,95203,C,yes,
-reservoir_bypass,pH,95204,pH,yes,
-reservoir_bypass,chlorophyll,95205,ug/L,yes,
-reservoir_bypass,ORP,95206,mV,yes,
-reservoir_bypass,DO,95207,mg/L,yes,
-reservoir_bypass,FDOM,95208,QSU,yes,
+site_code,parameter,sensor_number,units,active,lat_long
+reservoir_bypass,Turbidity,95201,NTU,yes,"40.44232864149273, -105.21886970440059"
+reservoir_bypass,Specific Conductivity,95202,us/cm,yes,"40.44232864149273, -105.21886970440059"
+reservoir_bypass,Temperature,95203,C,yes,"40.44232864149273, -105.21886970440059"
+reservoir_bypass,pH,95204,pH,yes,"40.44232864149273, -105.21886970440059"
+reservoir_bypass,chlorophyll,95205,ug/L,yes,"40.44232864149273, -105.21886970440059"
+reservoir_bypass,ORP,95206,mV,yes,"40.44232864149273, -105.21886970440059"
+reservoir_bypass,DO,95207,mg/L,yes,"40.44232864149273, -105.21886970440059"
+reservoir_bypass,FDOM,95208,QSU,yes,"40.44232864149273, -105.21886970440059"
 sulzer,Turbidity,11572011,NTU,yes,"40.43553450768172, -105.22849453601422"
 sulzer,Actual Conductivity,11572012,us/cm,yes,"40.43553450768172, -105.22849453601422"
 sulzer,Temperature,11572013,C,yes,"40.43553450768172, -105.22849453601422"
