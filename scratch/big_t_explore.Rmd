@@ -1,0 +1,252 @@
+---
+title: "Big Thompson Data Explore"
+author: "Sam Struthers-CSU"
+date: "`r Sys.Date()`"
+output: html_document
+---
+# Set Up
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(arrow)
+library(here)
+library(cdssr)
+library(tmap)
+library(sf)
+library(leaflet)
+library(tidyverse)
+library(nhdplusTools)
+library(yaml)
+library(snotelr)
+
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, fig.dim = c(12,10))
+```
+
+Basic overview of preliminary data available in the Big Thompson Basin
+
+
+# Get Approximate Watershed
+
+```{r}
+#Picking a site below the WTP
+location_coords <- c(-105.166145, 40.410814)
+start_point <- st_sfc(st_point(location_coords), crs = 4326)
+
+start_comid <- discover_nhdplus_id(start_point)
+
+nldi_feature <- list(featureSource = "comid", featureID = start_comid)
+
+#Getting Flowlines and watershed
+upstream_nldi <- navigate_nldi(
+  nldi_feature = nldi_feature,
+  mode = "upstreamTributaries", # "UT" equivalent
+  distance_km = 9999
+)
+
+big_t_flowlines <- upstream_nldi$UT_flowlines
+
+big_t_watershed <- get_nldi_basin(nldi_feature = nldi_feature)
+```
+
+
+# Read in locations of WQ/Flow Gages (Deployed or Not Yet)
+
+## CDWR Flow Gages
+
+```{r}
+creds <- read_yaml(here("creds/CDWRCreds.yml"))$api_key
+
+#Big T is the 4th water district
+telemetry <- get_telemetry_stations(water_district = 4, api_key = creds)%>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+#clip telemetry to watershed 
+telemetry <- telemetry[big_t_watershed,]
+```
+
+## Approximate CSU WQ Gages
+
+```{r}
+csu_sites <- read.csv("data/csu_sonde_location_metadata.csv")%>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+```
+
+## WET WQ Sensors
+```{r}
+
+wet_sites <- read.csv("data/wet_sites_big_t.csv")%>%
+  #split lat_long into separate columns
+  separate(lat_long, into = c("latitude", "longitude"), sep = ",")%>%
+  na.omit()%>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+```
+
+
+## Place holder for NW Data
+
+B, is this easy to get and do we want it?
+
+## SNOTEL
+```{r}
+snotel_sites <- snotel_info()%>%
+  filter(grepl("10190006", description, ignore.case = TRUE) | site_name == "lake irene " )%>%
+  mutate(`Site Name` = str_to_title(site_name))%>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)%>%
+  select(`Site Name`, site_id, `Start Date` = start, `End Date` = end, geometry)
+```
+
+
+# Map of Sites
+```{r}
+
+#Make a map with sites colored by station_type and add the watershed boundary 
+tmap_mode("view")
+
+tm_basemap("OpenStreetMap") +
+  tm_shape(big_t_watershed) +
+  tm_polygons(fill = "lightblue", fill_alpha = 0.5) +
+  # flowlines
+  tm_shape(big_t_flowlines) +
+  tm_lines(col = "blue", lwd = 1) +
+  # telemetry stations
+  tm_shape(telemetry %>%select(station_type, station_name, abbrev, units, parameter, station_por_start, station_por_end)) +
+  tm_dots(
+    fill = "station_type",
+    size = 1,
+    shape = 23,   # filled diamond
+    fill.scale = tm_scale_categorical(values = "brewer.set1"),
+    fill.legend = tm_legend(title = "CDWR Stations", na.show = FALSE)
+  ) +
+  # CSU sites
+  tm_shape(csu_sites) +
+  tm_dots(
+    fill = "site_code",
+    size = 1,
+    shape = 22,   # filled square
+    fill.scale = tm_scale_categorical(values = "brewer.set2"),
+    fill.legend = tm_legend(title = "CSU Site", na.show = FALSE)
+  ) +
+  # WET sites
+  tm_shape(wet_sites) +
+  tm_dots(
+    fill = "site_code",
+    size = 1,
+    shape = 21,   # filled circle
+    fill.scale = tm_scale_categorical(values = "brewer.set3"),
+    fill.legend = tm_legend(title = "WET Site", na.show = FALSE)
+  ) +
+  # SNOTEL sites
+  tm_shape(snotel_sites) +
+  tm_dots(
+    fill = "Site Name",
+    size = 1,
+    shape = 24,   # filled triangle (point-up)
+    fill.scale = tm_scale_categorical(values = "Accent"),
+    fill.legend = tm_legend(title = "SNOTEL Site", na.show = FALSE)
+  ) +
+  tm_layout(
+    legend.outside = TRUE,
+    legend.outside.position = "right"
+  )
+
+```
+
+# Code to pull in data from CDWR telemetry API
+
+Moving forward, we will want to pull in data from the CDWR telemetry API using an API key (located in the hidden creds folder). This will be done using the `get_telemetry_ts` function from the `cdssr` package. The following code snippet demonstrates how to pull in data for all telemetry stations within the Big Thompson watershed for a specified date range.
+
+
+```{r}
+startdate = "2026-03-01"
+enddate = "2026-12-31"
+#If you are going to pull in more than 2 years, you will want CDWR creds
+creds <- read_yaml(here("creds/CDWRCreds.yml"))$api_key
+
+all_data <- map2(telemetry$abbrev, telemetry$parameter, function(abbrev_oi, parameter_oi) {
+    tryCatch({
+      get_telemetry_ts(
+        abbrev = abbrev_oi, 
+        parameter = parameter_oi, 
+        start_date = startdate, 
+        end_date = enddate, 
+        api_key = creds,
+        timescale = "raw"
+      )
+    }, error = function(e) {
+      message("Error pulling data for station: ", abbrev_oi, " and parameter: ", parameter_oi, " - ", e$message)
+      return(NULL) # Explicitly return NULL on failure
+    })
+  }
+) %>%
+  bind_rows() %>%
+  mutate(parameter = ifelse(parameter == "DISCHRG2", "DISCHRG", parameter))%>%
+  mutate(meas_unit = ifelse(meas_unit == "CFS", "cfs", meas_unit))%>%
+  left_join(
+    telemetry %>%
+    st_drop_geometry() %>%
+    select(abbrev,station_name, station_type), by = "abbrev"
+    )
+```
+
+
+```{r}
+all_data%>%
+  mutate(type_unit = paste0(station_type, " (", meas_unit, ")"))%>% 
+  ggplot(.,
+         aes(x = datetime, y = meas_value, color = type_unit)) +
+  geom_line() +
+  facet_wrap(~station_name, scales = "free_y") +
+  labs(title = "Telemetry Data from Big Thompson Watershed",
+       x = "Date",
+       y = "Value",
+       color = "Units")
+```
+
+
+
+## Trim out the sites we don't want
+
+```{r}
+telemetry%>%
+  filter(station_status == "Active")%>%
+  write_csv(here("data", "cdwr_sites_oi.csv"))
+
+```
+
+# Rewrite of `pull_wet_api` for loveland
+
+Changes:
+- Changed to use a csv file with the relevant site IDs and parameters to pull from the WET API
+- Slight clean up of how data is manipulated using this CSV
+
+```{r}
+
+source("R/pull_wet_api_loveland.R")
+
+```
+
+## Testing new WET API function
+
+```{r}
+ sites <- c("reservoir_bypass", "sulzer", "cherry", "north_fork")
+
+ new_WET_data <- map_dfr(sites,
+                        ~pull_wet_api_loveland(
+                          target_site = .x,
+                          start_datetime = ymd_hms("2026-03-01 12:00:00", tz = "MST"),
+                          end_datetime = Sys.time()
+                        ))
+ ggplot(new_WET_data, aes(x = DT_round_MT, y = value, color = site)) +
+   geom_line() +
+   facet_wrap(~ parameter, scales = "free_y") +
+   labs(title = "WET Data from Big Thompson Watershed",
+        x = "Date",
+        y = "Value",
+        color = "Parameter"   
+ )
+```
+
+Seems like some funky stuff is going on with the WET API. Should be able to clean it up with `ross.wq.tools` a bit. BUT the API puller works and we can pull in the WET WQ data 
+
